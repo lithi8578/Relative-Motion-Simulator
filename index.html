@@ -86,11 +86,11 @@
         }
         canvas { display: block; width: 100%; height: 100%; }
 
-        /* 改進後的飛行控制面板：確保在 iPad 底部與邊緣完全顯示 */
+        /* 飛行控制面板：使用 fixed 定位確保完全顯示在右下角 */
         #flight-deck {
-            position: relative; 
-            margin-right:50px;
-            margin-bottom:200px;
+            position: fixed; 
+            bottom: max(15px, env(safe-area-inset-bottom));
+            right: max(15px, env(safe-area-inset-right));
             width: 140px; 
             background: rgba(30, 30, 30, 0.8);
             border: 1px solid rgba(0, 212, 255, 0.4); 
@@ -103,6 +103,8 @@
             backdrop-filter: blur(15px); 
             user-select: none;
             z-index: 20;
+            max-height: 90vh;
+            overflow-y: auto;
         }
         .deck-section { width: 100%; display: flex; flex-direction: column; align-items: center; margin-bottom: 10px; }
         .joystick-area {
@@ -398,4 +400,3 @@ animate();
 </script>
 </body>
 </html>
-
