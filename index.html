@@ -3,128 +3,110 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>雙質點相對運動 - 飛行觀察員模擬器</title>
+    <title>物理觀察模擬器 - 空間極大化</title>
     <style>
         :root {
-            --panel-bg: #1e1e1e;
+            --panel-bg: #121212;
             --accent: #00d4ff;
-            --danger: #e74c3c;
-            --text: #e0e0e0;
-            --btn-bg: #333;
+            --danger: #ff4757;
+            --text: #ffffff;
+            --btn-bg: #2f3542;
         }
         * { touch-action: manipulation; box-sizing: border-box; }
-        body { margin: 0; display: flex; font-family: 'Segoe UI', system-ui, sans-serif; background: #000; color: var(--text); height: 100vh; overflow: hidden; }
+        body { margin: 0; display: flex; font-family: -apple-system, system-ui, sans-serif; background: #000; color: var(--text); height: 100vh; overflow: hidden; }
         
+        /* 縮小後的側邊欄 */
         #sidebar { 
-            width: 320px; padding: 20px; background: var(--panel-bg); 
+            width: 220px; padding: 12px; background: var(--panel-bg); 
             display: flex; flex-direction: column; height: 100%; 
             border-right: 1px solid #333; z-index: 10;
-        }
-        @media (max-width: 768px) {
-            #sidebar { width: 250px; padding: 10px; font-size: 14px; }
-            h3 { font-size: 1em; }
+            overflow-y: auto; font-size: 13px;
         }
 
-        .scroll-area { flex-grow: 1; overflow-y: auto; padding-right: 8px; }
-        .group { border: 1px solid #444; padding: 12px; margin-bottom: 15px; border-radius: 8px; background: #262626; }
-        
-        h3 { margin: 0 0 12px 0; color: var(--accent); border-bottom: 1px solid #444; padding-bottom: 6px; }
-        .input-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
-        label { font-size: 11px; color: #aaa; }
+        .group { border: 1px solid #333; padding: 10px; margin-bottom: 10px; border-radius: 8px; background: #1a1a1a; }
+        h3 { margin: 0 0 8px 0; color: var(--accent); font-size: 13px; border-bottom: 1px solid #333; padding-bottom: 4px; }
+        .input-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+        label { font-size: 11px; color: #888; }
         
         input[type="number"] { 
-            width: 55px; background: #111; border: 1px solid #555; color: var(--accent); 
-            padding: 4px; border-radius: 4px; font-family: monospace;
+            width: 45px; background: #000; border: 1px solid #444; color: var(--accent); 
+            padding: 3px; border-radius: 4px; font-family: monospace; font-size: 12px; text-align: center;
         }
         
-        select, #resetBtn { width: 100%; padding: 12px; cursor: pointer; border-radius: 6px; border: none; font-size: 14px; margin-top: 10px; }
-        select { background: #444; color: white; }
+        select, #resetBtn { width: 100%; padding: 8px; cursor: pointer; border-radius: 6px; border: none; font-size: 13px; margin-top: 5px; }
+        select { background: var(--btn-bg); color: white; }
         #resetBtn { background: var(--danger); color: white; font-weight: bold; margin-top: auto; }
-        #resetBtn:active { background: #c0392b; transform: scale(0.98); }
 
-        #viewport { position: relative; flex-grow: 1; overflow: hidden; }
+        #viewport { position: relative; flex-grow: 1; overflow: hidden; background: #050505; }
         canvas { display: block; width: 100%; height: 100%; }
 
-        /* 飛行控制儀表板 */
+        /* 迷你飛行控制面板 */
         #flight-deck {
-            position: absolute; bottom: 30px; right: 30px;
-            width: 170px; height: 280px;
-            background: rgba(30, 30, 30, 0.9);
-            border: 2px solid var(--accent);
-            border-radius: 20px;
+            position: absolute; bottom: 15px; right: 15px;
+            width: 140px; background: rgba(20, 20, 20, 0.7);
+            border: 1px solid rgba(0, 212, 255, 0.3); border-radius: 16px;
             display: flex; flex-direction: column; align-items: center;
-            padding: 15px; box-shadow: 0 0 30px rgba(0,0,0,0.8);
-            backdrop-filter: blur(10px);
-            user-select: none;
+            padding: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+            backdrop-filter: blur(10px); user-select: none;
         }
-        .deck-section { width: 100%; display: flex; flex-direction: column; align-items: center; margin-bottom: 15px; }
-        
+        .deck-section { width: 100%; display: flex; flex-direction: column; align-items: center; margin-bottom: 8px; }
         .joystick-area {
-            width: 100px; height: 100px;
-            background: #000; border-radius: 50%;
-            border: 2px solid #444; position: relative;
-            display: flex; align-items: center; justify-content: center;
+            width: 80px; height: 80px; background: rgba(0,0,0,0.5); border-radius: 50%;
+            border: 1px solid #333; position: relative; display: flex; align-items: center; justify-content: center;
             touch-action: none;
         }
         .joystick-handle {
-            width: 35px; height: 35px;
-            background: var(--accent); border-radius: 50%;
-            box-shadow: 0 0 15px var(--accent);
-            position: relative;
-            z-index: 2;
+            width: 28px; height: 28px; background: var(--accent);
+            border-radius: 50%; box-shadow: 0 0 10px rgba(0, 212, 255, 0.5); position: relative; z-index: 2;
         }
-        
-        .deck-row { display: flex; width: 100%; justify-content: space-between; gap: 8px; margin-top: 5px; }
+        .deck-row { display: flex; width: 100%; justify-content: space-between; gap: 4px; }
         .deck-btn {
-            flex: 1; height: 40px; background: var(--btn-bg); border-radius: 8px;
+            flex: 1; height: 30px; background: #222; border-radius: 6px;
             display: flex; align-items: center; justify-content: center;
-            cursor: pointer; font-size: 12px; font-weight: bold; color: #fff;
-            border: 1px solid #444;
+            cursor: pointer; font-size: 10px; font-weight: bold; color: #fff; border: 1px solid #333;
         }
-        .deck-btn.active { background: var(--accent); color: #000; border-color: #fff; }
-
-        .deck-label { font-size: 11px; color: var(--accent); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; font-weight: bold; }
+        .deck-btn.active { background: var(--accent); color: #000; }
+        .deck-label { font-size: 9px; color: var(--accent); margin-bottom: 4px; font-weight: bold; opacity: 0.8; }
 
         #mode-tag {
-            position: absolute; top: 20px; left: 20px;
-            background: rgba(0,0,0,0.7); padding: 8px 18px;
-            border-radius: 20px; border: 1px solid var(--accent);
-            font-size: 14px; color: #fff; pointer-events: none;
+            position: absolute; top: 15px; left: 15px;
+            background: rgba(0,0,0,0.5); padding: 5px 12px;
+            border-radius: 12px; border: 1px solid rgba(0, 212, 255, 0.3);
+            font-size: 12px; color: #fff; pointer-events: none;
         }
     </style>
 </head>
 <body>
 
 <div id="sidebar">
-    <div class="scroll-area">
-        <h3>環境設定</h3>
-        <label>觀察模式</label>
-        <select id="viewMode">
-            <option value="absolute">地面固定座標系</option>
-            <option value="drone">空拍機動態觀測</option>
-        </select>
+    <h3 style="color: var(--accent); font-weight: bold; margin-bottom: 15px;">控制面板</h3>
+    
+    <label style="margin-bottom: 4px; display: block;">觀察視角</label>
+    <select id="viewMode">
+        <option value="absolute">絕對座標</option>
+        <option value="drone">自定義空拍</option>
+    </select>
 
-        <div class="input-row" style="margin-top: 15px;">
-            <label>時間流速</label>
-            <input type="number" id="timeScale" value="1.0" step="0.1">
-        </div>
-
-        <!-- 根據使用者要求更新初始數值 -->
-        <div class="group">
-            <h3 style="color: #ff4444;">質點 A</h3>
-            <div class="input-row"><label>初位 X, Y</label><span><input type="number" id="ax" value="-300"> <input type="number" id="ay" value="0"></span></div>
-            <div class="input-row"><label>初速 Vx, Vy</label><span><input type="number" id="avx" value="20"> <input type="number" id="avy" value="0"></span></div>
-            <div class="input-row"><label>加速 Ax, Ay</label><span><input type="number" id="aax" value="-3"> <input type="number" id="aay" value="0"></span></div>
-        </div>
-
-        <div class="group">
-            <h3 style="color: #44ff44;">質點 B</h3>
-            <div class="input-row"><label>初位 X, Y</label><span><input type="number" id="bx" value="100"> <input type="number" id="by" value="0"></span></div>
-            <div class="input-row"><label>初速 Vx, Vy</label><span><input type="number" id="bvx" value="-20"> <input type="number" id="bvy" value="0"></span></div>
-            <div class="input-row"><label>加速 Ax, Ay</label><span><input type="number" id="bax" value="3"> <input type="number" id="bay" value="0"></span></div>
-        </div>
+    <div class="input-row" style="margin-top: 10px;">
+        <label>時間步長</label>
+        <input type="number" id="timeScale" value="1.0" step="0.1">
     </div>
-    <button id="resetBtn">重置模擬系統</button>
+
+    <div class="group">
+        <h3 style="color: #ff4757;">質點 A</h3>
+        <div class="input-row"><label>位置X,Y</label><span><input type="number" id="ax" value="-300"><input type="number" id="ay" value="0"></span></div>
+        <div class="input-row"><label>初速V</label><span><input type="number" id="avx" value="20"><input type="number" id="avy" value="0"></span></div>
+        <div class="input-row"><label>加速A</label><span><input type="number" id="aax" value="-3"><input type="number" id="aay" value="0"></span></div>
+    </div>
+
+    <div class="group">
+        <h3 style="color: #2ed573;">質點 B</h3>
+        <div class="input-row"><label>位置X,Y</label><span><input type="number" id="bx" value="100"><input type="number" id="by" value="0"></span></div>
+        <div class="input-row"><label>初速V</label><span><input type="number" id="bvx" value="-20"><input type="number" id="bvy" value="0"></span></div>
+        <div class="input-row"><label>加速A</label><span><input type="number" id="bax" value="3"><input type="number" id="bay" value="0"></span></div>
+    </div>
+    
+    <button id="resetBtn">重置系統</button>
 </div>
 
 <div id="viewport">
@@ -133,22 +115,19 @@
 
     <div id="flight-deck">
         <div class="deck-section">
-            <span class="deck-label">Manual Velocity</span>
+            <span class="deck-label">PILOT</span>
             <div class="joystick-area" id="joyArea">
                 <div class="joystick-handle" id="joyHandle"></div>
             </div>
         </div>
-
         <div class="deck-section">
-            <span class="deck-label">Sync Lock</span>
+            <span class="deck-label">LOCK</span>
             <div class="deck-row">
-                <div class="deck-btn" id="lockA">Lock A</div>
-                <div class="deck-btn" id="lockB">Lock B</div>
+                <div class="deck-btn" id="lockA">A</div>
+                <div class="deck-btn" id="lockB">B</div>
             </div>
         </div>
-
         <div class="deck-section" style="margin-bottom: 0;">
-            <span class="deck-label">Altitude</span>
             <div class="deck-row">
                 <div class="deck-btn" id="zoomOut">−</div>
                 <div class="deck-btn" id="zoomIn">+</div>
@@ -161,18 +140,17 @@
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 const gui = {};
-
 const ids = ['ax','ay','avx','avy','aax','aay','bx','by','bvx','bvy','bax','bay','timeScale','viewMode','resetBtn'];
 ids.forEach(id => gui[id] = document.getElementById(id));
 
-let zoom = 1.0;
+let zoom = 0.8;
 let droneV = { x: 0, y: 0 };
 let dronePos = { x: 0, y: 0 };
 let isDragging = false;
 let syncTarget = null; 
 
-const SPEED_MULTIPLIER = 6; 
-const JOYSTICK_LIMIT = 45; 
+const SPEED_MULTIPLIER = 7; 
+const JOYSTICK_LIMIT = 35; 
 
 class Particle {
     constructor(color, prefix) {
@@ -195,18 +173,16 @@ class Particle {
         this.pos.y = this.p0.y + this.v0.y * this.t + 0.5 * this.acc.y * this.t**2;
         this.vel.x = this.v0.x + this.acc.x * this.t;
         this.vel.y = this.v0.y + this.acc.y * this.t;
-        
         this.path.push({ x: this.pos.x, y: this.pos.y, t: this.t });
-        if (this.path.length > 800) this.path.shift();
+        if (this.path.length > 2000) this.path.shift();
     }
 }
 
-let pA = new Particle('#ff4444', 'a');
-let pB = new Particle('#44ff44', 'b');
+let pA = new Particle('#ff4757', 'a');
+let pB = new Particle('#2ed573', 'b');
 
 const joyHandle = document.getElementById('joyHandle');
 const joyArea = document.getElementById('joyArea');
-const modeTag = document.getElementById('mode-tag');
 
 function updateJoystickUI(vx, vy) {
     let dx = vx / SPEED_MULTIPLIER;
@@ -218,14 +194,6 @@ function updateJoystickUI(vx, vy) {
     }
     joyHandle.style.transform = `translate(${dx}px, ${dy}px)`;
 }
-
-const startDrag = (e) => {
-    isDragging = true;
-    syncTarget = null;
-    document.getElementById('lockA').classList.remove('active');
-    document.getElementById('lockB').classList.remove('active');
-    handleDrag(e);
-};
 
 const handleDrag = (e) => {
     if (!isDragging) return;
@@ -247,10 +215,10 @@ const handleDrag = (e) => {
     if (gui.viewMode.value !== 'drone') gui.viewMode.value = 'drone';
 };
 
-joyArea.addEventListener('mousedown', startDrag);
-joyArea.addEventListener('touchstart', startDrag, {passive: false});
+joyArea.addEventListener('mousedown', (e) => { isDragging = true; syncTarget = null; document.querySelectorAll('.deck-btn').forEach(b => b.classList.remove('active')); handleDrag(e); });
+joyArea.addEventListener('touchstart', (e) => { isDragging = true; syncTarget = null; document.querySelectorAll('.deck-btn').forEach(b => b.classList.remove('active')); handleDrag(e); }, {passive: false});
 window.addEventListener('mousemove', handleDrag);
-window.addEventListener('touchmove', (e) => { if (isDragging) e.preventDefault(); handleDrag(e); }, {passive: false});
+window.addEventListener('touchmove', (e) => { if (isDragging) { e.preventDefault(); handleDrag(e); } }, {passive: false});
 window.addEventListener('mouseup', () => isDragging = false);
 window.addEventListener('touchend', () => isDragging = false);
 
@@ -260,54 +228,53 @@ document.getElementById('lockA').onclick = function() {
     document.getElementById('lockB').classList.remove('active');
     if(syncTarget === 'A') gui.viewMode.value = 'drone';
 };
-
 document.getElementById('lockB').onclick = function() {
     syncTarget = (syncTarget === 'B') ? null : 'B';
     this.classList.toggle('active');
     document.getElementById('lockA').classList.remove('active');
     if(syncTarget === 'B') gui.viewMode.value = 'drone';
 };
+document.getElementById('zoomIn').onclick = () => zoom *= 1.25;
+document.getElementById('zoomOut').onclick = () => zoom /= 1.25;
 
-document.getElementById('zoomIn').onclick = () => zoom *= 1.2;
-document.getElementById('zoomOut').onclick = () => zoom /= 1.2;
+function drawGrid(camX, camY) {
+    ctx.save();
+    const subSize = 100;
+    const viewW = canvas.width / zoom;
+    const viewH = canvas.height / zoom;
+    const startX = Math.floor((camX - viewW/2) / subSize) * subSize;
+    const endX = Math.ceil((camX + viewW/2) / subSize) * subSize;
+    const startY = Math.floor((camY - viewH/2) / subSize) * subSize;
+    const endY = Math.ceil((camY + viewH/2) / subSize) * subSize;
 
-function drawArrow(x, y, vx, vy, color) {
-    const s = 1.2; 
-    const head = 8 / zoom;
-    const tx = x + vx * s;
-    const ty = y + vy * s;
-    const angle = Math.atan2(vy, vx);
-    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(tx, ty);
-    ctx.strokeStyle = color; ctx.lineWidth = 2 / zoom; ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(tx, ty);
-    ctx.lineTo(tx - head * Math.cos(angle - 0.5), ty - head * Math.sin(angle - 0.5));
-    ctx.lineTo(tx - head * Math.cos(angle + 0.5), ty - head * Math.sin(angle + 0.5));
-    ctx.closePath(); ctx.fillStyle = color; ctx.fill();
+    ctx.beginPath(); ctx.strokeStyle = '#151515'; ctx.lineWidth = 1/zoom;
+    for (let x = startX; x <= endX; x += subSize) { ctx.moveTo(x, startY); ctx.lineTo(x, endY); }
+    for (let y = startY; y <= endY; y += subSize) { ctx.moveTo(startX, y); ctx.lineTo(endX, y); }
+    ctx.stroke();
+
+    ctx.beginPath(); ctx.strokeStyle = '#444'; ctx.lineWidth = 2/zoom;
+    ctx.moveTo(startX, 0); ctx.lineTo(endX, 0);
+    ctx.moveTo(0, startY); ctx.lineTo(0, endY);
+    ctx.stroke();
+    ctx.restore();
 }
 
 function animate() {
     const ts = parseFloat(gui.timeScale.value) || 0;
     const dt = 0.016 * ts;
-    pA.update(dt);
-    pB.update(dt);
-
-    const mode = gui.viewMode.value;
-    modeTag.innerText = `觀察模式：${gui.viewMode.options[gui.viewMode.selectedIndex].text}`;
+    pA.update(dt); pB.update(dt);
 
     if (syncTarget === 'A') {
-        droneV = { ...pA.vel };
-        dronePos = { ...pA.pos };
+        droneV = { ...pA.vel }; dronePos = { ...pA.pos };
         updateJoystickUI(droneV.x, droneV.y);
     } else if (syncTarget === 'B') {
-        droneV = { ...pB.vel };
-        dronePos = { ...pB.pos };
+        droneV = { ...pB.vel }; dronePos = { ...pB.pos };
         updateJoystickUI(droneV.x, droneV.y);
-    } else if (mode === 'drone') {
+    } else if (gui.viewMode.value === 'drone') {
         dronePos.x += droneV.x * dt;
         dronePos.y += droneV.y * dt;
     } else {
-        dronePos = { x: 0, y: 0 };
-        droneV = { x: 0, y: 0 };
+        dronePos = { x: 0, y: 0 }; droneV = { x: 0, y: 0 };
         if (!isDragging) updateJoystickUI(0, 0);
     }
 
@@ -317,66 +284,51 @@ function animate() {
     ctx.scale(zoom, zoom);
     ctx.translate(-dronePos.x, -dronePos.y);
 
-    ctx.beginPath(); ctx.strokeStyle = '#222'; ctx.lineWidth = 1/zoom;
-    for(let i = -10000; i <= 10000; i += 100) {
-        ctx.moveTo(i, -10000); ctx.lineTo(i, 10000);
-        ctx.moveTo(-10000, i); ctx.lineTo(10000, i);
-    }
-    ctx.stroke();
+    drawGrid(dronePos.x, dronePos.y);
 
-    const renderPath = (p) => {
-        if (p.path.length < 2) return;
-        ctx.beginPath(); ctx.strokeStyle = p.color + "77"; ctx.lineWidth = 2/zoom;
-        for(let i = 0; i < p.path.length; i++) {
-            let pt = p.path[i];
-            let dx = pt.x, dy = pt.y;
-            if (syncTarget === 'A') {
-                let ref = pA.path[i] || pA.pos;
-                dx = (pt.x - ref.x) + dronePos.x;
-                dy = (pt.y - ref.y) + dronePos.y;
-            } else if (syncTarget === 'B') {
-                let ref = pB.path[i] || pB.pos;
-                dx = (pt.x - ref.x) + dronePos.x;
-                dy = (pt.y - ref.y) + dronePos.y;
-            } else if (mode === 'drone') {
-                dx = (pt.x - droneV.x * pt.t) + dronePos.x;
-                dy = (pt.y - droneV.y * pt.t) + dronePos.y;
+    const renderObject = (p) => {
+        if (p.path.length > 2) {
+            ctx.beginPath(); ctx.strokeStyle = p.color + "66"; ctx.lineWidth = 3/zoom;
+            for(let i = 0; i < p.path.length; i++) {
+                let n = p.path[i];
+                let dx = n.x, dy = n.y;
+                if (syncTarget === 'A') { dx = (n.x - pA.path[i].x) + dronePos.x; dy = (n.y - pA.path[i].y) + dronePos.y; }
+                else if (syncTarget === 'B') { dx = (n.x - pB.path[i].x) + dronePos.x; dy = (n.y - pB.path[i].y) + dronePos.y; }
+                else if (gui.viewMode.value === 'drone' && !syncTarget) { dx = (n.x - droneV.x * n.t) + dronePos.x; dy = (n.y - droneV.y * n.t) + dronePos.y; }
+                if(i === 0) ctx.moveTo(dx, dy); else ctx.lineTo(dx, dy);
             }
-            if(i === 0) ctx.moveTo(dx, dy); else ctx.lineTo(dx, dy);
+            ctx.stroke();
         }
-        ctx.stroke();
+        ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(p.pos.x, p.pos.y, 10/zoom, 0, Math.PI*2); ctx.fill();
+        let rvX = p.vel.x - droneV.x, rvY = p.vel.y - droneV.y;
+        if (Math.hypot(rvX, rvY) > 0.5) {
+            const h = 10/zoom, tx = p.pos.x + rvX*1.2, ty = p.pos.y + rvY*1.2, ang = Math.atan2(rvY, rvX);
+            ctx.beginPath(); ctx.moveTo(p.pos.x, p.pos.y); ctx.lineTo(tx, ty);
+            ctx.strokeStyle = p.color; ctx.lineWidth = 3/zoom; ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(tx, ty);
+            ctx.lineTo(tx - h*Math.cos(ang-0.4), ty - h*Math.sin(ang-0.4));
+            ctx.lineTo(tx - h*Math.cos(ang+0.4), ty - h*Math.sin(ang+0.4));
+            ctx.closePath(); ctx.fill();
+        }
     };
-    renderPath(pA); renderPath(pB);
 
-    const renderObj = (p) => {
-        let x = p.pos.x, y = p.pos.y;
-        let relVX = p.vel.x - droneV.x, relVY = p.vel.y - droneV.y;
-        ctx.fillStyle = p.color;
-        ctx.beginPath(); ctx.arc(x, y, 8/zoom, 0, Math.PI*2); ctx.fill();
-        if (Math.hypot(relVX, relVY) > 0.1) drawArrow(x, y, relVX, relVY, p.color);
-    };
-    renderObj(pA); renderObj(pB);
-
+    renderObject(pA); renderObject(pB);
     ctx.restore();
     requestAnimationFrame(animate);
 }
 
 gui.resetBtn.onclick = () => {
-    pA.reset(); 
-    pB.reset();
-    dronePos = { x: 0, y: 0 }; 
-    droneV = { x: 0, y: 0 };
+    pA.reset(); pB.reset();
+    dronePos = { x: 0, y: 0 }; droneV = { x: 0, y: 0 };
     syncTarget = null;
     document.querySelectorAll('.deck-btn').forEach(b => b.classList.remove('active'));
     updateJoystickUI(0, 0);
 };
 
 window.onresize = () => {
-    const sidebarWidth = window.innerWidth > 768 ? 320 : 250;
-    canvas.width = window.innerWidth - sidebarWidth;
+    canvas.width = window.innerWidth - 220;
     canvas.height = window.innerHeight;
 };
-
 window.onresize();
 animate();
 </script>
