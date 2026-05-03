@@ -211,6 +211,8 @@ let dynamicSpeedMultiplier = 7; // 動態速度倍率
 const MIN_SPEED_MULTIPLIER = 5;  // 最小倍率（質點停止時）
 const MAX_SPEED_MULTIPLIER = 50; // 最大倍率（高速運動時）
 const JOYSTICK_LIMIT = 32;
+const GRID_SIZE = 50;  // 網格大小
+const GRID_MAJOR_INTERVAL = 5;  // 主網格線間隔（5個網格）
 
 class Particle {
     constructor(color, prefix) {
@@ -319,25 +321,104 @@ document.getElementById('lockB').onclick = function() {
 document.getElementById('zoomIn').onclick = () => zoom *= 1.2;
 document.getElementById('zoomOut').onclick = () => zoom /= 1.2;
 
+/**
+ * 繪製網格地面和坐標軸
+ * X軸正方向向右，Y軸正方向向上（標準數學座標系）
+ */
 function drawGrid(camX, camY) {
     ctx.save();
-    const subSize = 100;
+    
+    const majorGridSize = GRID_SIZE * GRID_MAJOR_INTERVAL;
     const viewW = canvas.width / zoom;
     const viewH = canvas.height / zoom;
-    const startX = Math.floor((camX - viewW/2) / subSize) * subSize;
-    const endX = Math.ceil((camX + viewW/2) / subSize) * subSize;
-    const startY = Math.floor((camY - viewH/2) / subSize) * subSize;
-    const endY = Math.ceil((camY + viewH/2) / subSize) * subSize;
+    
+    // 計算視窗範圍
+    const startX = Math.floor((camX - viewW/2) / GRID_SIZE) * GRID_SIZE;
+    const endX = Math.ceil((camX + viewW/2) / GRID_SIZE) * GRID_SIZE;
+    const startY = Math.floor((camY - viewH/2) / GRID_SIZE) * GRID_SIZE;
+    const endY = Math.ceil((camY + viewH/2) / GRID_SIZE) * GRID_SIZE;
 
-    ctx.beginPath(); ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 1/zoom;
-    for (let x = startX; x <= endX; x += subSize) { ctx.moveTo(x, startY); ctx.lineTo(x, endY); }
-    for (let y = startY; y <= endY; y += subSize) { ctx.moveTo(startX, y); ctx.lineTo(endX, y); }
+    // ========== 繪製細網格（背景網格）==========
+    ctx.beginPath();
+    ctx.strokeStyle = '#1a1a1a';
+    ctx.lineWidth = 1 / zoom;
+    
+    // 垂直網格線（X軸方向）
+    for (let x = startX; x <= endX; x += GRID_SIZE) {
+        ctx.moveTo(x, startY);
+        ctx.lineTo(x, endY);
+    }
+    // 水平網格線（Y軸方向）
+    for (let y = startY; y <= endY; y += GRID_SIZE) {
+        ctx.moveTo(startX, y);
+        ctx.lineTo(endX, y);
+    }
     ctx.stroke();
 
-    ctx.beginPath(); ctx.strokeStyle = '#333'; ctx.lineWidth = 2/zoom;
-    ctx.moveTo(startX, 0); ctx.lineTo(endX, 0);
-    ctx.moveTo(0, startY); ctx.lineTo(0, endY);
+    // ========== 繪製主網格線 ==========
+    ctx.beginPath();
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 2 / zoom;
+    
+    // 主網格 - 垂直線
+    for (let x = Math.floor(startX / majorGridSize) * majorGridSize; x <= endX; x += majorGridSize) {
+        ctx.moveTo(x, startY);
+        ctx.lineTo(x, endY);
+    }
+    // 主網格 - 水平線
+    for (let y = Math.floor(startY / majorGridSize) * majorGridSize; y <= endY; y += majorGridSize) {
+        ctx.moveTo(startX, y);
+        ctx.lineTo(endX, y);
+    }
     ctx.stroke();
+
+    // ========== 繪製坐標軸 ==========
+    ctx.beginPath();
+    ctx.strokeStyle = '#00ff00';  // Y軸綠色
+    ctx.lineWidth = 2.5 / zoom;
+    ctx.moveTo(0, startY);
+    ctx.lineTo(0, endY);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.strokeStyle = '#ff0000';  // X軸紅色
+    ctx.lineWidth = 2.5 / zoom;
+    ctx.moveTo(startX, 0);
+    ctx.lineTo(endX, 0);
+    ctx.stroke();
+
+    // ========== 繪製坐標軸箭頭 ==========
+    const arrowSize = 15 / zoom;
+    
+    // X軸箭頭（向右）
+    const xArrowX = Math.min(endX - arrowSize * 2, camX + viewW / 2 - arrowSize * 3);
+    ctx.fillStyle = '#ff0000';
+    ctx.beginPath();
+    ctx.moveTo(xArrowX, 0);
+    ctx.lineTo(xArrowX - arrowSize, -arrowSize * 0.6);
+    ctx.lineTo(xArrowX - arrowSize, arrowSize * 0.6);
+    ctx.closePath();
+    ctx.fill();
+
+    // Y軸箭頭（向上）
+    const yArrowY = Math.min(endY - arrowSize * 2, camY + viewH / 2 - arrowSize * 3);
+    ctx.fillStyle = '#00ff00';
+    ctx.beginPath();
+    ctx.moveTo(0, yArrowY);
+    ctx.lineTo(-arrowSize * 0.6, yArrowY - arrowSize);
+    ctx.lineTo(arrowSize * 0.6, yArrowY - arrowSize);
+    ctx.closePath();
+    ctx.fill();
+
+    // ========== 繪製軸標籤 ==========
+    ctx.fillStyle = '#fff';
+    ctx.font = `${14 / zoom}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    
+    ctx.fillText('X', xArrowX + arrowSize * 1.5, -arrowSize * 1.2);
+    ctx.fillText('Y', arrowSize * 1.2, yArrowY + arrowSize * 1.5);
+
     ctx.restore();
 }
 
