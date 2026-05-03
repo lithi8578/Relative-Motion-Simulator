@@ -204,10 +204,13 @@ let zoom = 0.8;
 let droneV = { x: 0, y: 0 };
 let dronePos = { x: 0, y: 0 };
 let isDragging = false;
-let syncTarget = null; 
+let syncTarget = null;
+let dynamicSpeedMultiplier = 7; // 動態速度倍率
 
-const SPEED_MULTIPLIER = 7; 
-const JOYSTICK_LIMIT = 32; 
+// 常數設定
+const MIN_SPEED_MULTIPLIER = 5;  // 最小倍率（質點停止時）
+const MAX_SPEED_MULTIPLIER = 50; // 最大倍率（高速運動時）
+const JOYSTICK_LIMIT = 32;
 
 class Particle {
     constructor(color, prefix) {
@@ -233,6 +236,10 @@ class Particle {
         this.path.push({ x: this.pos.x, y: this.pos.y, t: this.t });
         if (this.path.length > 1500) this.path.shift();
     }
+    // 取得速度大小（量級）
+    getSpeedMagnitude() {
+        return Math.hypot(this.vel.x, this.vel.y);
+    }
 }
 
 let pA = new Particle('#ff4757', 'a');
@@ -241,9 +248,27 @@ let pB = new Particle('#2ed573', 'b');
 const joyHandle = document.getElementById('joyHandle');
 const joyArea = document.getElementById('joyArea');
 
+/**
+ * 動態計算速度倍率
+ * 使無人機最高速度 = 質點中速度最快的量級
+ */
+function calculateDynamicSpeedMultiplier() {
+    const speedA = pA.getSpeedMagnitude();
+    const speedB = pB.getSpeedMagnitude();
+    const maxParticleSpeed = Math.max(speedA, speedB);
+    
+    // 根據質點最高速度計算倍率
+    // 公式：倍率 = maxParticleSpeed / (JOYSTICK_LIMIT / UI顯示時間常數)
+    // 簡化為：直接使用 maxParticleSpeed 作為倍率基礎
+    const baseMultiplier = Math.max(maxParticleSpeed, MIN_SPEED_MULTIPLIER);
+    dynamicSpeedMultiplier = Math.min(baseMultiplier, MAX_SPEED_MULTIPLIER);
+    
+    return dynamicSpeedMultiplier;
+}
+
 function updateJoystickUI(vx, vy) {
-    let dx = vx / SPEED_MULTIPLIER;
-    let dy = vy / SPEED_MULTIPLIER;
+    let dx = vx / dynamicSpeedMultiplier;
+    let dy = vy / dynamicSpeedMultiplier;
     const dist = Math.hypot(dx, dy);
     if (dist > JOYSTICK_LIMIT) {
         dx *= JOYSTICK_LIMIT / dist;
@@ -267,8 +292,8 @@ const handleDrag = (e) => {
         dy *= JOYSTICK_LIMIT / dist;
     }
     joyHandle.style.transform = `translate(${dx}px, ${dy}px)`;
-    droneV.x = dx * SPEED_MULTIPLIER; 
-    droneV.y = dy * SPEED_MULTIPLIER;
+    droneV.x = dx * dynamicSpeedMultiplier; 
+    droneV.y = dy * dynamicSpeedMultiplier;
     if (gui.viewMode.value !== 'drone') gui.viewMode.value = 'drone';
 };
 
@@ -320,6 +345,9 @@ function animate() {
     const ts = parseFloat(gui.timeScale.value) || 0;
     const dt = 0.016 * ts;
     pA.update(dt); pB.update(dt);
+
+    // 每幀更新動態速度倍率
+    calculateDynamicSpeedMultiplier();
 
     if (syncTarget === 'A') {
         droneV = { ...pA.vel }; dronePos = { ...pA.pos };
@@ -389,6 +417,7 @@ gui.resetBtn.onclick = () => {
     syncTarget = null;
     document.querySelectorAll('.deck-btn').forEach(b => b.classList.remove('active'));
     updateJoystickUI(0, 0);
+    calculateDynamicSpeedMultiplier();
 };
 
 window.onresize = () => {
