@@ -2,8 +2,8 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Relative Motion Simulator</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>物理觀察模擬器 - iPad 優化</title>
     <style>
         :root {
             --panel-bg: #121212;
@@ -12,101 +12,156 @@
             --text: #ffffff;
             --btn-bg: #2f3542;
         }
-        * { touch-action: manipulation; box-sizing: border-box; }
-        body { margin: 0; display: flex; font-family: -apple-system, system-ui, sans-serif; background: #000; color: var(--text); height: 100vh; overflow: hidden; }
+        * { 
+            touch-action: manipulation; 
+            box-sizing: border-box; 
+            -webkit-user-select: none; /* 防止 iPad 長按選取文字 */
+        }
+        body { 
+            margin: 0; 
+            display: flex; 
+            font-family: -apple-system, system-ui, sans-serif; 
+            background: #000; 
+            color: var(--text); 
+            height: 100vh; 
+            width: 100vw;
+            overflow: hidden; 
+        }
         
-        /* 縮小後的側邊欄 */
+        /* 側邊欄：增加滾動條與安全區域間距 */
         #sidebar { 
-            width: 220px; padding: 12px; background: var(--panel-bg); 
-            display: flex; flex-direction: column; height: 100%; 
-            border-right: 1px solid #333; z-index: 10;
-            overflow-y: auto; font-size: 13px;
+            width: 220px; 
+            padding: 15px; 
+            padding-bottom: env(safe-area-inset-bottom);
+            background: var(--panel-bg); 
+            display: flex; 
+            flex-direction: column; 
+            height: 100%; 
+            border-right: 1px solid #333; 
+            z-index: 10;
+            overflow-y: auto; 
+            font-size: 13px;
+            flex-shrink: 0;
         }
 
+        #resetBtn { 
+            width: 100%; 
+            padding: 12px; 
+            cursor: pointer; 
+            border-radius: 10px; 
+            border: none; 
+            font-size: 14px; 
+            font-weight: bold; 
+            background: var(--danger); 
+            color: white; 
+            margin-bottom: 15px; 
+            flex-shrink: 0;
+            box-shadow: 0 4px 12px rgba(255, 71, 87, 0.3);
+        }
+        #resetBtn:active { transform: scale(0.95); opacity: 0.9; }
+
         .group { border: 1px solid #333; padding: 10px; margin-bottom: 10px; border-radius: 8px; background: #1a1a1a; }
-        h3 { margin: 0 0 8px 0; color: var(--accent); font-size: 13px; border-bottom: 1px solid #333; padding-bottom: 4px; }
+        h3 { margin: 0 0 8px 0; color: var(--accent); font-size: 12px; border-bottom: 1px solid #333; padding-bottom: 4px; font-weight: 600; }
+        
         .input-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
         label { font-size: 11px; color: #888; }
         
         input[type="number"] { 
             width: 45px; background: #000; border: 1px solid #444; color: var(--accent); 
-            padding: 3px; border-radius: 4px; font-family: monospace; font-size: 12px; text-align: center;
+            padding: 4px; border-radius: 4px; font-family: monospace; font-size: 12px; text-align: center;
         }
         
-        select, #resetBtn { width: 100%; padding: 8px; cursor: pointer; border-radius: 6px; border: none; font-size: 13px; margin-top: 5px; }
-        select { background: var(--btn-bg); color: white; }
-        #resetBtn { background: var(--danger); color: white; font-weight: bold; margin-top: auto; }
+        select { 
+            width: 100%; padding: 10px; border-radius: 8px; border: none; 
+            font-size: 13px; background: var(--btn-bg); color: white; margin-bottom: 15px; 
+            appearance: none;
+        }
 
-        #viewport { position: relative; flex-grow: 1; overflow: hidden; background: #050505; }
+        #viewport { 
+            position: relative; 
+            flex-grow: 1; 
+            height: 100%;
+            overflow: hidden; 
+            background: #050505; 
+        }
         canvas { display: block; width: 100%; height: 100%; }
 
-        /* 迷你飛行控制面板 */
+        /* 改進後的飛行控制面板：確保在 iPad 底部與邊緣完全顯示 */
         #flight-deck {
-            position: absolute; bottom: 15px; right: 15px;
-            width: 140px; background: rgba(20, 20, 20, 0.7);
-            border: 1px solid rgba(0, 212, 255, 0.3); border-radius: 16px;
-            display: flex; flex-direction: column; align-items: center;
-            padding: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.5);
-            backdrop-filter: blur(10px); user-select: none;
+            position: absolute; 
+            bottom: max(25px, env(safe-area-inset-bottom)); 
+            right: max(20px, env(safe-area-inset-right));
+            width: 140px; 
+            background: rgba(30, 30, 30, 0.8);
+            border: 1px solid rgba(0, 212, 255, 0.4); 
+            border-radius: 20px;
+            display: flex; 
+            flex-direction: column; 
+            align-items: center;
+            padding: 12px; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+            backdrop-filter: blur(15px); 
+            user-select: none;
+            z-index: 20;
         }
-        .deck-section { width: 100%; display: flex; flex-direction: column; align-items: center; margin-bottom: 8px; }
+        .deck-section { width: 100%; display: flex; flex-direction: column; align-items: center; margin-bottom: 10px; }
         .joystick-area {
-            width: 80px; height: 80px; background: rgba(0,0,0,0.5); border-radius: 50%;
-            border: 1px solid #333; position: relative; display: flex; align-items: center; justify-content: center;
+            width: 80px; height: 80px; background: rgba(0,0,0,0.6); border-radius: 50%;
+            border: 1px solid #444; position: relative; display: flex; align-items: center; justify-content: center;
             touch-action: none;
         }
         .joystick-handle {
-            width: 28px; height: 28px; background: var(--accent);
-            border-radius: 50%; box-shadow: 0 0 10px rgba(0, 212, 255, 0.5); position: relative; z-index: 2;
+            width: 30px; height: 30px; background: radial-gradient(circle at 30% 30%, var(--accent), #0088aa);
+            border-radius: 50%; box-shadow: 0 0 15px rgba(0, 212, 255, 0.6); position: relative; z-index: 2;
         }
-        .deck-row { display: flex; width: 100%; justify-content: space-between; gap: 4px; }
+        .deck-row { display: flex; width: 100%; justify-content: space-between; gap: 6px; }
         .deck-btn {
-            flex: 1; height: 30px; background: #222; border-radius: 6px;
+            flex: 1; height: 32px; background: #2a2a2a; border-radius: 8px;
             display: flex; align-items: center; justify-content: center;
-            cursor: pointer; font-size: 10px; font-weight: bold; color: #fff; border: 1px solid #333;
+            cursor: pointer; font-size: 11px; font-weight: bold; color: #fff; border: 1px solid #444;
         }
-        .deck-btn.active { background: var(--accent); color: #000; }
-        .deck-label { font-size: 9px; color: var(--accent); margin-bottom: 4px; font-weight: bold; opacity: 0.8; }
+        .deck-btn.active { background: var(--accent); color: #000; border-color: #fff; }
+        .deck-label { font-size: 10px; color: var(--accent); margin-bottom: 5px; font-weight: bold; opacity: 0.9; text-transform: uppercase; }
 
         #mode-tag {
             position: absolute; top: 15px; left: 15px;
-            background: rgba(0,0,0,0.5); padding: 5px 12px;
-            border-radius: 12px; border: 1px solid rgba(0, 212, 255, 0.3);
-            font-size: 12px; color: #fff; pointer-events: none;
+            background: rgba(0,0,0,0.6); padding: 6px 15px;
+            border-radius: 15px; border: 1px solid rgba(0, 212, 255, 0.3);
+            font-size: 12px; color: #fff; pointer-events: none; z-index: 15;
         }
     </style>
 </head>
 <body>
 
 <div id="sidebar">
-    <h3 style="color: var(--accent); font-weight: bold; margin-bottom: 15px;">控制面板</h3>
+    <h3 style="color: var(--accent); margin-bottom: 12px; border: none; font-size: 16px;">控制中心</h3>
     
-    <label style="margin-bottom: 4px; display: block;">觀察視角</label>
+    <button id="resetBtn">重置物理系統</button>
+    
+    <label style="margin-bottom: 5px; display: block;">觀察視角模式</label>
     <select id="viewMode">
-        <option value="absolute">絕對座標</option>
-        <option value="drone">自定義空拍</option>
+        <option value="absolute">絕對座標系</option>
+        <option value="drone">自定義空拍模式</option>
     </select>
 
-    <div class="input-row" style="margin-top: 10px;">
-        <label>時間步長</label>
+    <div class="input-row">
+        <label>模擬速度 (dt)</label>
         <input type="number" id="timeScale" value="1.0" step="0.1">
     </div>
 
     <div class="group">
-        <h3 style="color: #ff4757;">質點 A</h3>
-        <div class="input-row"><label>位置X,Y</label><span><input type="number" id="ax" value="-300"><input type="number" id="ay" value="0"></span></div>
-        <div class="input-row"><label>初速V</label><span><input type="number" id="avx" value="20"><input type="number" id="avy" value="0"></span></div>
-        <div class="input-row"><label>加速A</label><span><input type="number" id="aax" value="-3"><input type="number" id="aay" value="0"></span></div>
+        <h3 style="color: #ff4757;">質點 A (RED)</h3>
+        <div class="input-row"><label>位置 X, Y</label><span><input type="number" id="ax" value="-300"><input type="number" id="ay" value="0"></span></div>
+        <div class="input-row"><label>速度 Vx, Vy</label><span><input type="number" id="avx" value="20"><input type="number" id="avy" value="0"></span></div>
+        <div class="input-row"><label>加速 Ax, Ay</label><span><input type="number" id="aax" value="-3"><input type="number" id="aay" value="0"></span></div>
     </div>
 
     <div class="group">
-        <h3 style="color: #2ed573;">質點 B</h3>
-        <div class="input-row"><label>位置X,Y</label><span><input type="number" id="bx" value="100"><input type="number" id="by" value="0"></span></div>
-        <div class="input-row"><label>初速V</label><span><input type="number" id="bvx" value="-20"><input type="number" id="bvy" value="0"></span></div>
-        <div class="input-row"><label>加速A</label><span><input type="number" id="bax" value="3"><input type="number" id="bay" value="0"></span></div>
+        <h3 style="color: #2ed573;">質點 B (GREEN)</h3>
+        <div class="input-row"><label>位置 X, Y</label><span><input type="number" id="bx" value="100"><input type="number" id="by" value="0"></span></div>
+        <div class="input-row"><label>速度 Vx, Vy</label><span><input type="number" id="bvx" value="-20"><input type="number" id="bvy" value="0"></span></div>
+        <div class="input-row"><label>加速 Ax, Ay</label><span><input type="number" id="bax" value="3"><input type="number" id="bay" value="0"></span></div>
     </div>
-    
-    <button id="resetBtn">重置系統</button>
 </div>
 
 <div id="viewport">
@@ -115,16 +170,16 @@
 
     <div id="flight-deck">
         <div class="deck-section">
-            <span class="deck-label">PILOT</span>
+            <span class="deck-label">Manual Pilot</span>
             <div class="joystick-area" id="joyArea">
                 <div class="joystick-handle" id="joyHandle"></div>
             </div>
         </div>
         <div class="deck-section">
-            <span class="deck-label">LOCK</span>
+            <span class="deck-label">Target Lock</span>
             <div class="deck-row">
-                <div class="deck-btn" id="lockA">A</div>
-                <div class="deck-btn" id="lockB">B</div>
+                <div class="deck-btn" id="lockA">Lock A</div>
+                <div class="deck-btn" id="lockB">Lock B</div>
             </div>
         </div>
         <div class="deck-section" style="margin-bottom: 0;">
@@ -149,8 +204,8 @@ let dronePos = { x: 0, y: 0 };
 let isDragging = false;
 let syncTarget = null; 
 
-const SPEED_MULTIPLIER = 9; 
-const JOYSTICK_LIMIT = 35; 
+const SPEED_MULTIPLIER = 7; 
+const JOYSTICK_LIMIT = 32; 
 
 class Particle {
     constructor(color, prefix) {
@@ -174,7 +229,7 @@ class Particle {
         this.vel.x = this.v0.x + this.acc.x * this.t;
         this.vel.y = this.v0.y + this.acc.y * this.t;
         this.path.push({ x: this.pos.x, y: this.pos.y, t: this.t });
-        if (this.path.length > 2000) this.path.shift();
+        if (this.path.length > 1500) this.path.shift();
     }
 }
 
@@ -234,8 +289,8 @@ document.getElementById('lockB').onclick = function() {
     document.getElementById('lockA').classList.remove('active');
     if(syncTarget === 'B') gui.viewMode.value = 'drone';
 };
-document.getElementById('zoomIn').onclick = () => zoom *= 1.25;
-document.getElementById('zoomOut').onclick = () => zoom /= 1.25;
+document.getElementById('zoomIn').onclick = () => zoom *= 1.2;
+document.getElementById('zoomOut').onclick = () => zoom /= 1.2;
 
 function drawGrid(camX, camY) {
     ctx.save();
@@ -247,12 +302,12 @@ function drawGrid(camX, camY) {
     const startY = Math.floor((camY - viewH/2) / subSize) * subSize;
     const endY = Math.ceil((camY + viewH/2) / subSize) * subSize;
 
-    ctx.beginPath(); ctx.strokeStyle = '#151515'; ctx.lineWidth = 1/zoom;
+    ctx.beginPath(); ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 1/zoom;
     for (let x = startX; x <= endX; x += subSize) { ctx.moveTo(x, startY); ctx.lineTo(x, endY); }
     for (let y = startY; y <= endY; y += subSize) { ctx.moveTo(startX, y); ctx.lineTo(endX, y); }
     ctx.stroke();
 
-    ctx.beginPath(); ctx.strokeStyle = '#444'; ctx.lineWidth = 2/zoom;
+    ctx.beginPath(); ctx.strokeStyle = '#333'; ctx.lineWidth = 2/zoom;
     ctx.moveTo(startX, 0); ctx.lineTo(endX, 0);
     ctx.moveTo(0, startY); ctx.lineTo(0, endY);
     ctx.stroke();
@@ -278,6 +333,8 @@ function animate() {
         if (!isDragging) updateJoystickUI(0, 0);
     }
 
+    document.getElementById('mode-tag').innerText = `模式：${gui.viewMode.options[gui.viewMode.selectedIndex].text}`;
+
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.save();
     ctx.translate(canvas.width / 2, canvas.height / 2);
@@ -288,7 +345,7 @@ function animate() {
 
     const renderObject = (p) => {
         if (p.path.length > 2) {
-            ctx.beginPath(); ctx.strokeStyle = p.color + "66"; ctx.lineWidth = 3/zoom;
+            ctx.beginPath(); ctx.strokeStyle = p.color + "55"; ctx.lineWidth = 3/zoom;
             for(let i = 0; i < p.path.length; i++) {
                 let n = p.path[i];
                 let dx = n.x, dy = n.y;
@@ -299,7 +356,14 @@ function animate() {
             }
             ctx.stroke();
         }
+        
+        // 質點本體
+        ctx.save();
+        ctx.shadowBlur = 10; ctx.shadowColor = p.color;
         ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(p.pos.x, p.pos.y, 10/zoom, 0, Math.PI*2); ctx.fill();
+        ctx.restore();
+
+        // 相對速度向量 (相對於目前觀察者/無人機)
         let rvX = p.vel.x - droneV.x, rvY = p.vel.y - droneV.y;
         if (Math.hypot(rvX, rvY) > 0.5) {
             const h = 10/zoom, tx = p.pos.x + rvX*1.2, ty = p.pos.y + rvY*1.2, ang = Math.atan2(rvY, rvX);
@@ -334,3 +398,4 @@ animate();
 </script>
 </body>
 </html>
+
