@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>二維雙質點相對運動模擬器</title>
+    <style>
+        :root {
+            --bg-color: #050505;
+            --panel-bg: rgba(20, 20, 25, 0.6);
+            --panel-border: rgba(255, 255, 255, 0.1);
+            --text-primary: #e0e0e0;
+            --text-secondary: #888;
+            --accent: #3b82f6;
+            --color-a: #ff4757; /* RED */
+            --color-b: #2ed573; /* GREEN */
+            --color-cm: #feca57; /* YELLOW */
+            --grid-color: rgba(255, 255, 255, 0.05);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        
+        body { background-color: var(--bg-color); color: var(--text-primary); overflow: hidden; touch-action: none; }
+        
+        canvas { display: block; width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; z-index: 1; }
+
+        /* Glassmorphism Panels */
+        .glass-panel {
+            background: var(--panel-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--panel-border);
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            z-index: 10;
+            position: absolute;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Sidebar (Left) */
+        #sidebar {
+            top: 70px; left: 20px; bottom: 20px; width: 280px;
+            padding: 20px; overflow-y: auto;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        #sidebar.collapsed {
+            transform: translateX(calc(-100% - 40px));
+        }
+
+        #sidebarToggle {
+            top: 20px; left: 20px; width: 40px; height: 40px;
+            padding: 0; display: flex; justify-content: center; align-items: center;
+            font-size: 1.2rem; z-index: 20; border-radius: 12px;
+        }
+
+        /* Flight Deck (Bottom Right) */
+        #flight-deck {
+            bottom: 20px; right: 20px; padding: 12px; width: 200px;
+        }
+
+        /* Time Control (Bottom Center) */
+        #time-deck {
+            bottom: 20px; left: 50%; transform: translateX(-50%);
+            padding: 10px 20px; width: 500px; max-width: 50vw;
+            flex-direction: row; align-items: center; gap: 15px;
+        }
+
+        h2, h3 { font-size: 1rem; margin-bottom: 15px; color: white; border-bottom: 1px solid var(--panel-border); padding-bottom: 5px; }
+        h3 { font-size: 0.85rem; margin-top: 10px; margin-bottom: 10px; border: none; color: var(--text-secondary); }
+
+        .control-group { margin-bottom: 12px; }
+        .control-group label { display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 4px; }
+        .control-group input[type="range"] { width: 100%; cursor: pointer; accent-color: var(--accent); }
+        
+        select, button {
+            width: 100%; padding: 8px; border-radius: 8px; border: 1px solid var(--panel-border);
+            background: rgba(0,0,0,0.5); color: white; cursor: pointer; font-size: 0.9rem;
+        }
+        button { background: var(--accent); border: none; font-weight: bold; margin-bottom: 10px; transition: background 0.2s;}
+        button:active { background: #2563eb; }
+        button.danger { background: #e84118; }
+
+        /* Drone Controls */
+        .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+        .btn-grid button { margin: 0; background: rgba(255,255,255,0.1); border: 1px solid var(--panel-border); font-weight: normal; padding: 6px; font-size: 0.75rem; }
+        .btn-grid button.active { background: var(--accent); border-color: var(--accent); }
+        .btn-grid button[data-target="A"].active { background: var(--color-a); border-color: var(--color-a); }
+        .btn-grid button[data-target="B"].active { background: var(--color-b); border-color: var(--color-b); }
+        .btn-grid button[data-target="CM"].active { background: var(--color-cm); border-color: var(--color-cm); color: black;}
+
+        /* Joystick */
+        #joystickZone {
+            width: 100px; height: 100px; border-radius: 50%;
+            background: rgba(255, 255, 255, 0.05); border: 2px solid rgba(255, 255, 255, 0.1);
+            margin: 10px auto; position: relative; touch-action: none; box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+        }
+        #joystickStick {
+            width: 36px; height: 36px; border-radius: 50%;
+            background: var(--accent); position: absolute;
+            top: 50%; left: 50%; transform: translate(-50%, -50%);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5); pointer-events: none;
+            transition: background 0.2s;
+        }
+
+        .hud { font-family: monospace; font-size: 0.7rem; color: var(--accent); text-align: right; }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
+
+        @media (max-width: 768px) {
+            #sidebarToggle { top: 10px; left: 10px; }
+            #sidebar { width: 220px; top: 60px; left: 10px; bottom: 120px; }
+            #flight-deck { bottom: 10px; right: 10px; width: 180px; }
+            #time-deck { bottom: 10px; left: 10px; transform: none; width: calc(100vw - 210px); }
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="simCanvas"></canvas>
+
+    <!-- Sidebar Toggle Button -->
+    <button id="sidebarToggle" class="glass-panel">☰</button>
+
+    <!-- Sidebar: Parameters -->
+    <div id="sidebar" class="glass-panel">
+        <h2>物理引擎控制</h2>
+        <button id="btnReset" class="danger">重置時間與軌跡 (t=0)</button>
+        
+        <div class="control-group">
+            <label>模擬模式</label>
+            <select id="modeSelect">
+                <option value="PROJECTILE">拋體分裂 (動量守恆)</option>
+                <option value="SPRING">雙振子彈簧 (簡諧運動)</option>
+                <option value="BINARY">雙星互繞 (萬有引力)</option>
+            </select>
+        </div>
+
+        <div class="control-group">
+            <label>顯示設定</label>
+            <div style="display: flex; gap: 10px; font-size: 0.8rem; margin-top: 5px;">
+                <label><input type="checkbox" id="chkShowCM" checked> 質心</label>
+                <label><input type="checkbox" id="chkShowA" checked> A(紅)</label>
+                <label><input type="checkbox" id="chkShowB" checked> B(綠)</label>
+            </div>
+        </div>
+
+        <div id="dynamicParams">
+            <!-- 參數滑桿將由 JS 動態生成 -->
+        </div>
+    </div>
+
+    <!-- Time Deck: Timeline -->
+    <div id="time-deck" class="glass-panel">
+        <button id="btnPlayPause" style="width: 50px; margin: 0;">暫停</button>
+        <input type="range" id="timeSlider" min="0" max="20" step="0.01" value="0" style="flex-grow: 1;">
+        <div style="font-family: monospace; width: 60px; text-align: right;" id="timeDisplay">t: 0.00</div>
+    </div>
+
+    <!-- Flight Deck: Drone Camera -->
+    <div id="flight-deck" class="glass-panel">
+        <h2>無人機視角鎖定</h2>
+        <div class="btn-grid" id="targetButtons">
+            <button data-target="ABS" class="active">絕對座標</button>
+            <button data-target="CM">質心 (CM)</button>
+            <button data-target="A">質點 A (RED)</button>
+            <button data-target="B">質點 B (GRN)</button>
+        </div>
+        
+        <div class="control-group">
+            <label><span>縮放 (Zoom)</span> <span id="zoomVal">1.0x</span></label>
+            <input type="range" id="zoomSlider" min="0.1" max="5" step="0.1" value="1">
+        </div>
+        
+        <div class="control-group" style="margin-top: 15px;">
+            <label style="justify-content: center; font-weight: bold;">無人機飛行搖桿</label>
+            <div id="joystickZone">
+                <div id="joystickStick"></div>
+            </div>
+        </div>
+        
+        <div class="hud" id="hudData">
+            Pos: (0, 0)<br>Zoom: 1.0
+        </div>
+    </div>
+
+<script>
+/**
+ * 雙質點相對運動模擬器 - 核心邏輯
+ * 採用純解析解 (Analytical Solutions) 實作
+ */
+
+// --- 1. 狀態管理與參數定義 ---
+const State = {
+    mode: 'PROJECTILE',
+    t: 0,
+    isPlaying: true,
+    lastTime: performance.now(),
+    drone: { target: 'ABS', x: 0, y: 0, zoom: 1.0 }, // 攝影機 (無人機) 世界座標
+    visibility: { cm: true, a: true, b: true }, // 顯示開關
+    
+    // 定義各模式的參數與預設值
+    params: {
+        PROJECTILE: {
+            M_total: { val: 10, min: 1, max: 20, step: 1, label: '總質量 (M)' },
+            m1_ratio: { val: 0.5, min: 0.1, max: 0.9, step: 0.1, label: 'A質量佔比 (m1/M)' },
+            v0: { val: 60, min: 10, max: 100, step: 1, label: '初速 (v0)' },
+            theta0: { val: 60, min: 10, max: 90, step: 1, label: '拋射角 (deg)' },
+            g: { val: 9.8, min: 1, max: 20, step: 0.1, label: '重力加速度 (g)' },
+            t_split: { val: 3.0, min: 0.5, max: 10, step: 0.1, label: '分裂觸發時間 (s)' },
+            J_mag: { val: 100, min: 0, max: 300, step: 5, label: '內力衝量大小 (J)' },
+            J_angle: { val: 0, min: -180, max: 180, step: 5, label: '內力衝量角 (對地, deg)' }
+        },
+        SPRING: {
+            m1: { val: 5, min: 1, max: 20, step: 1, label: '質點 A 質量' },
+            m2: { val: 5, min: 1, max: 20, step: 1, label: '質點 B 質量' },
+            k: { val: 20, min: 1, max: 100, step: 1, label: '彈簧常數 (k)' },
+            L_rest: { val: 40, min: 10, max: 100, step: 1, label: '彈簧原長' },
+            L_init: { val: 80, min: 20, max: 200, step: 1, label: '初始拉伸長度' },
+            angle: { val: 30, min: 0, max: 360, step: 1, label: '系統傾角 (deg)' },
+            Vcm_x: { val: 10, min: -50, max: 50, step: 1, label: '質心平移速度 X' },
+            Vcm_y: { val: 0, min: -50, max: 50, step: 1, label: '質心平移速度 Y' }
+        },
+        BINARY: {
+            m1: { val: 100, min: 10, max: 500, step: 10, label: '星體 A 質量' },
+            m2: { val: 100, min: 10, max: 500, step: 10, label: '星體 B 質量' },
+            R: { val: 150, min: 50, max: 300, step: 5, label: '初始軌道距離' },
+            G: { val: 100, min: 10, max: 500, step: 10, label: '萬有引力常數' },
+            Vcm_x: { val: 5, min: -30, max: 30, step: 1, label: '系統平移速度 X' },
+            Vcm_y: { val: 0, min: -30, max: 30, step: 1, label: '系統平移速度 Y' }
+        }
+    }
+};
+
+// 獲取當前模式的實時參數值 (方便計算)
+function getP() {
+    let p = {};
+    for (const key in State.params[State.mode]) p[key] = State.params[State.mode][key].val;
+    return p;
+}
+
+// --- 2. 物理引擎 (解析解計算) ---
+// 返回 { p1: {x,y}, p2: {x,y}, pCm: {x,y}, state: 'PRE'|'POST' }
+// 物理世界座標系：Y 軸向上為正
+function calcPositions(t) {
+    const p = getP();
+    let res = { p1: {x:0, y:0}, p2: {x:0, y:0}, pCm: {x:0, y:0}, phase: 'POST' };
+
+    if (State.mode === 'PROJECTILE') {
+        const m1 = p.M_total * p.m1_ratio;
+        const m2 = p.M_total - m1;
+        const rad0 = p.theta0 * Math.PI / 180;
+        
+        // 質心始終遵循原始斜拋軌跡
+        res.pCm.x = p.v0 * Math.cos(rad0) * t;
+        res.pCm.y = p.v0 * Math.sin(rad0) * t - 0.5 * p.g * t * t;
+
+        if (t < p.t_split) {
+            res.phase = 'PRE';
+            res.p1 = { ...res.pCm };
+            res.p2 = { ...res.pCm }; // 分裂前兩者重合
+        } else {
+            res.phase = 'POST';
+            // 1. 計算分裂瞬間的狀態
+            const ts = p.t_split;
+            const x_split = p.v0 * Math.cos(rad0) * ts;
+            const y_split = p.v0 * Math.sin(rad0) * ts - 0.5 * p.g * ts * ts;
+            const vx_pre = p.v0 * Math.cos(rad0);
+            const vy_pre = p.v0 * Math.sin(rad0) - p.g * ts;
+            
+            // 新邏輯：對地角 (0 度為 +X，90度為 +Y)
+            const jRad = p.J_angle * Math.PI / 180;
+            
+            const Jx = p.J_mag * Math.cos(jRad);
+            const Jy = p.J_mag * Math.sin(jRad);
+
+            // 分裂後初速 (動量守恆：V = Vpre + J/m)
+            const v1x = vx_pre + Jx / m1;
+            const v1y = vy_pre + Jy / m1;
+            const v2x = vx_pre - Jx / m2; // 反向衝量
+            const v2y = vy_pre - Jy / m2;
+
+            // 2. 計算分裂後的位置 t' = t - ts
+            const dt = t - ts;
+            res.p1.x = x_split + v1x * dt;
+            res.p1.y = y_split + v1y * dt - 0.5 * p.g * dt * dt;
+            res.p2.x = x_split + v2x * dt;
+            res.p2.y = y_split + v2y * dt - 0.5 * p.g * dt * dt;
+        }
+    } 
+    else if (State.mode === 'SPRING') {
+        const M = p.m1 + p.m2;
+        const mu = (p.m1 * p.m2) / M; // 約化質量
+        const w = Math.sqrt(p.k / mu); // 角頻率
+        const A = p.L_init - p.L_rest; // 振幅
+        const rad = p.angle * Math.PI / 180;
+
+        res.pCm.x = p.Vcm_x * t;
+        res.pCm.y = p.Vcm_y * t;
+
+        // 相對距離 (SHM)
+        const L_t = p.L_rest + A * Math.cos(w * t);
+        
+        // 質點相對質心的距離分配
+        const d1 = L_t * (p.m2 / M);
+        const d2 = L_t * (p.m1 / M);
+
+        res.p1.x = res.pCm.x - d1 * Math.cos(rad);
+        res.p1.y = res.pCm.y - d1 * Math.sin(rad);
+        res.p2.x = res.pCm.x + d2 * Math.cos(rad);
+        res.p2.y = res.pCm.y + d2 * Math.sin(rad);
+    }
+    else if (State.mode === 'BINARY') {
+        const M = p.m1 + p.m2;
+        const w = Math.sqrt(p.G * M / Math.pow(p.R, 3));
+        
+        res.pCm.x = p.Vcm_x * t;
+        res.pCm.y = p.Vcm_y * t;
+
+        const r1 = p.R * (p.m2 / M);
+        const r2 = p.R * (p.m1 / M);
+
+        res.p1.x = res.pCm.x - r1 * Math.cos(w * t);
+        res.p1.y = res.pCm.y - r1 * Math.sin(w * t);
+        res.p2.x = res.pCm.x + r2 * Math.cos(w * t);
+        res.p2.y = res.pCm.y + r2 * Math.sin(w * t);
+    }
+
+    return res;
+}
+
+// --- 3. 渲染引擎與座標系統 ---
+const canvas = document.getElementById('simCanvas');
+const ctx = canvas.getContext('2d', { alpha: false }); // 優化效能
+let cw, ch;
+
+function resize() {
+    cw = canvas.width = window.innerWidth;
+    ch = canvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resize);
+resize();
+
+// 世界座標 (World) 轉 螢幕座標 (Screen)
+// 注意：物理世界 Y 向上，螢幕 Y 向下
+function w2s(wx, wy) {
+    return {
+        x: (wx - State.drone.x) * State.drone.zoom + cw / 2,
+        y: ch / 2 - (wy - State.drone.y) * State.drone.zoom
+    };
+}
+
+// 螢幕轉世界 (用於滑鼠拖拽計算)
+function s2w(sx, sy) {
+    return {
+        x: (sx - cw / 2) / State.drone.zoom + State.drone.x,
+        y: State.drone.y - (sy - ch / 2) / State.drone.zoom
+    };
+}
+
+function drawGrid() {
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+    ctx.lineWidth = 1;
+    
+    // 動態決定網格大小 (隨縮放改變)
+    let gridSizeWorld = 50;
+    if (State.drone.zoom < 0.3) gridSizeWorld = 200;
+    else if (State.drone.zoom > 2) gridSizeWorld = 10;
+    
+    const gridSizeScreen = gridSizeWorld * State.drone.zoom;
+    
+    // 決定網格原點：絕對模式下為 (0,0)，追蹤模式下為目標位置
+    let refX = 0;
+    let refY = 0;
+    if (State.drone.target !== 'ABS') {
+        refX = State.drone.x;
+        refY = State.drone.y;
+    }
+
+    // 計算螢幕邊界對應的世界座標範圍
+    const tl = s2w(0, 0);
+    const br = s2w(cw, ch);
+    
+    const startX = Math.floor((tl.x - refX) / gridSizeWorld) * gridSizeWorld + refX;
+    const endX = Math.ceil((br.x - refX) / gridSizeWorld) * gridSizeWorld + refX;
+    const startY = Math.floor((br.y - refY) / gridSizeWorld) * gridSizeWorld + refY; // y是反的，br.y 實際上是較小的世界 Y
+    const endY = Math.ceil((tl.y - refY) / gridSizeWorld) * gridSizeWorld + refY;
+
+    ctx.beginPath();
+    // 垂直線
+    for (let x = startX; x <= endX; x += gridSizeWorld) {
+        let sx = w2s(x, 0).x;
+        ctx.moveTo(sx, 0); ctx.lineTo(sx, ch);
+    }
+    // 水平線
+    for (let y = startY; y <= endY; y += gridSizeWorld) {
+        let sy = w2s(0, y).y;
+        ctx.moveTo(0, sy); ctx.lineTo(cw, sy);
+    }
+    ctx.stroke();
+
+    // 畫相對/絕對世界原點軸 (粗線)
+    ctx.strokeStyle = State.drone.target === 'ABS' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(100, 150, 255, 0.3)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    const origin = w2s(refX, refY);
+    ctx.moveTo(origin.x, 0); ctx.lineTo(origin.x, ch);
+    ctx.moveTo(0, origin.y); ctx.lineTo(cw, origin.y);
+    ctx.stroke();
+}
+
+function drawTrail(target, color, maxTime) {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    
+    // 回溯繪製過去的軌跡 (使用解析解直接算)
+    const steps = 60;
+    const dt = maxTime / steps;
+    
+    for (let i = 0; i <= steps; i++) {
+        let pt = i * dt;
+        let pos = calcPositions(pt);
+        let coord;
+        if (target === 'A') coord = w2s(pos.p1.x, pos.p1.y);
+        else if (target === 'B') coord = w2s(pos.p2.x, pos.p2.y);
+        else coord = w2s(pos.pCm.x, pos.pCm.y);
+        
+        if (i === 0) ctx.moveTo(coord.x, coord.y);
+        else ctx.lineTo(coord.x, coord.y);
+    }
+    ctx.stroke();
+}
+
+function render() {
+    // 1. 時間更新
+    const now = performance.now();
+    const dt = (now - State.lastTime) / 1000;
+    State.lastTime = now;
+    
+    if (State.isPlaying) {
+        State.t += dt;
+        document.getElementById('timeSlider').value = State.t;
+        document.getElementById('timeDisplay').innerText = `t: ${State.t.toFixed(2)}`;
+    }
+
+    // 2. 計算當前物理狀態
+    const currPos = calcPositions(State.t);
+
+    // 3. 無人機追蹤邏輯與飛行控制
+    if (State.drone.target !== 'ABS') {
+        let tPos = currPos.pCm;
+        if (State.drone.target === 'A') tPos = currPos.p1;
+        if (State.drone.target === 'B') tPos = currPos.p2;
+        
+        // 平滑追蹤 (Lerp)
+        State.drone.x += (tPos.x - State.drone.x) * 0.2;
+        State.drone.y += (tPos.y - State.drone.y) * 0.2;
+    } else {
+        // 手動搖桿飛行控制
+        if (typeof stickVector !== 'undefined' && (stickVector.x !== 0 || stickVector.y !== 0)) {
+            // 根據縮放比例調整飛行速度 (Zoom越小，看越廣，飛得越快)
+            const flightSpeed = 150 / State.drone.zoom; 
+            State.drone.x += stickVector.x * flightSpeed * dt;
+            State.drone.y -= stickVector.y * flightSpeed * dt; // 世界Y軸向上，螢幕搖桿Y向下，需反向
+        }
+    }
+    
+    // 更新 HUD
+    document.getElementById('hudData').innerHTML = 
+        `Cam: (${State.drone.x.toFixed(0)}, ${State.drone.y.toFixed(0)})<br>Zoom: ${State.drone.zoom.toFixed(1)}x`;
+
+    // 4. 清除畫布並繪製背景
+    ctx.fillStyle = '#050505';
+    ctx.fillRect(0, 0, cw, ch);
+    
+    drawGrid();
+
+    // 5. 繪製軌跡
+    const maxT = Math.max(0.1, State.t);
+    if (State.mode === 'PROJECTILE' && currPos.phase === 'PRE') {
+        // 分裂前只畫質心軌跡
+        if (State.visibility.cm) drawTrail('CM', 'rgba(255,255,255,0.4)', maxT);
+    } else {
+        if (State.visibility.cm) drawTrail('CM', 'rgba(254, 202, 87, 0.4)', maxT); // 黃虛線
+        if (State.visibility.a) drawTrail('A', 'rgba(255, 71, 87, 0.5)', maxT);  // 紅線
+        if (State.visibility.b) drawTrail('B', 'rgba(46, 213, 115, 0.5)', maxT); // 綠線
+    }
+
+    // 6. 繪製物體 (彈簧模式畫連線)
+    if (State.mode === 'SPRING' && State.visibility.a && State.visibility.b) {
+        let s1 = w2s(currPos.p1.x, currPos.p1.y);
+        let s2 = w2s(currPos.p2.x, currPos.p2.y);
+        ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+        ctx.lineWidth = 3 * State.drone.zoom;
+        ctx.beginPath();
+        ctx.moveTo(s1.x, s1.y); ctx.lineTo(s2.x, s2.y);
+        ctx.stroke();
+    }
+
+    // 繪製圓點輔助函數
+    const drawCircle = (worldX, worldY, radius, color, glow) => {
+        let s = w2s(worldX, worldY);
+        let rScreen = radius * State.drone.zoom;
+        if (rScreen < 3) rScreen = 3; // 最小可視半徑
+        
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, rScreen, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        if (glow) {
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = color;
+        }
+        ctx.fill();
+        ctx.shadowBlur = 0; // 重置
+    };
+
+    // 根據模式繪製實體
+    const p = getP();
+    if (State.mode === 'PROJECTILE') {
+        if (currPos.phase === 'PRE') {
+            // 分裂前：一顆大白球
+            if (State.visibility.cm) drawCircle(currPos.pCm.x, currPos.pCm.y, p.M_total, '#fff', true);
+        } else {
+            // 分裂後：虛擬質心 + 兩顆碎片
+            if (State.visibility.cm) drawCircle(currPos.pCm.x, currPos.pCm.y, 4, 'rgba(254, 202, 87, 0.5)', false); // 虛影
+            if (State.visibility.a) drawCircle(currPos.p1.x, currPos.p1.y, p.M_total * p.m1_ratio, '#ff4757', true);
+            if (State.visibility.b) drawCircle(currPos.p2.x, currPos.p2.y, p.M_total * (1 - p.m1_ratio), '#2ed573', true);
+        }
+    } else {
+        // 雙星或彈簧
+        if (State.visibility.cm) drawCircle(currPos.pCm.x, currPos.pCm.y, 4, '#feca57', false); // 質心
+        let r1 = p.m1 || p.M_total/2; // 簡單視覺大小
+        let r2 = p.m2 || p.M_total/2;
+        if(State.mode === 'BINARY') { r1/=10; r2/=10; } // 雙星質量數字大，縮小視覺
+        if (State.visibility.a) drawCircle(currPos.p1.x, currPos.p1.y, r1, '#ff4757', true);
+        if (State.visibility.b) drawCircle(currPos.p2.x, currPos.p2.y, r2, '#2ed573', true);
+    }
+
+    requestAnimationFrame(render);
+}
+
+
+// --- 4. UI 綁定與事件監聽 ---
+
+function buildUI() {
+    const container = document.getElementById('dynamicParams');
+    container.innerHTML = '';
+    const params = State.params[State.mode];
+
+    for (const key in params) {
+        const p = params[key];
+        const div = document.createElement('div');
+        div.className = 'control-group';
+        div.innerHTML = `
+            <label><span>${p.label}</span> <span id="val_${key}">${p.val}</span></label>
+            <input type="range" id="input_${key}" min="${p.min}" max="${p.max}" step="${p.step}" value="${p.val}">
+        `;
+        container.appendChild(div);
+
+        // 綁定事件
+        document.getElementById(`input_${key}`).addEventListener('input', (e) => {
+            const v = parseFloat(e.target.value);
+            State.params[State.mode][key].val = v;
+            document.getElementById(`val_${key}`).innerText = v;
+            
+            // 某些參數改變需要重置時間避免畫面突變
+            if (['t_split', 'v0'].includes(key)) {
+                resetSim();
+            }
+        });
+    }
+}
+
+function resetSim() {
+    State.t = 0;
+    document.getElementById('timeSlider').value = 0;
+    // 稍微重置視角到原點附近
+    if(State.drone.target === 'ABS') {
+        State.drone.x = 0; State.drone.y = 0;
+    }
+}
+
+// 事件：模式切換
+document.getElementById('modeSelect').addEventListener('change', (e) => {
+    State.mode = e.target.value;
+    resetSim();
+    buildUI();
+});
+
+// 事件：重置按鈕
+document.getElementById('btnReset').addEventListener('click', resetSim);
+
+// 事件：顯示開關切換
+document.getElementById('chkShowCM').addEventListener('change', (e) => State.visibility.cm = e.target.checked);
+document.getElementById('chkShowA').addEventListener('change', (e) => State.visibility.a = e.target.checked);
+document.getElementById('chkShowB').addEventListener('change', (e) => State.visibility.b = e.target.checked);
+
+// 事件：播放暫停
+const btnPlay = document.getElementById('btnPlayPause');
+btnPlay.addEventListener('click', () => {
+    State.isPlaying = !State.isPlaying;
+    btnPlay.innerText = State.isPlaying ? '暫停' : '播放';
+});
+
+// 事件：時間軸拖動
+const timeSlider = document.getElementById('timeSlider');
+timeSlider.addEventListener('input', (e) => {
+    State.t = parseFloat(e.target.value);
+    State.isPlaying = false; // 拖動時自動暫停
+    btnPlay.innerText = '播放';
+    document.getElementById('timeDisplay').innerText = `t: ${State.t.toFixed(2)}`;
+});
+
+// 事件：無人機目標切換
+document.querySelectorAll('#targetButtons button').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        document.querySelectorAll('#targetButtons button').forEach(b => b.classList.remove('active'));
+        e.target.classList.add('active');
+        State.drone.target = e.target.dataset.target;
+    });
+});
+
+// 事件：縮放
+document.getElementById('zoomSlider').addEventListener('input', (e) => {
+    State.drone.zoom = parseFloat(e.target.value);
+    document.getElementById('zoomVal').innerText = State.drone.zoom.toFixed(1) + 'x';
+});
+
+// 事件：Canvas 拖拽平移 (強制切換為絕對座標模式)
+let isDragging = false;
+let lastMouse = {x:0, y:0};
+
+// --- 側邊欄收合事件 ---
+document.getElementById('sidebarToggle').addEventListener('click', () => {
+    document.getElementById('sidebar').classList.toggle('collapsed');
+});
+
+// --- 搖桿控制事件 (Joystick) ---
+const joystickZone = document.getElementById('joystickZone');
+const joystickStick = document.getElementById('joystickStick');
+let stickActive = false;
+let stickVector = {x: 0, y: 0};
+
+function handleStick(e) {
+    if (!stickActive) return;
+    const rect = joystickZone.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    
+    let dx = e.clientX - centerX;
+    let dy = e.clientY - centerY;
+    const maxR = rect.width / 2 - 10; // 減去搖桿半徑的緩衝區
+    
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    if (dist > maxR) {
+        dx = (dx / dist) * maxR;
+        dy = (dy / dist) * maxR;
+    }
+    
+    joystickStick.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+    
+    // 輸出正規化向量 (-1 到 1) 給 render() 使用
+    stickVector.x = dx / maxR;
+    stickVector.y = dy / maxR;
+    
+    // 操作搖桿時自動解除目標鎖定
+    if (State.drone.target !== 'ABS') {
+        State.drone.target = 'ABS';
+        document.querySelectorAll('#targetButtons button').forEach(b => b.classList.remove('active'));
+        document.querySelector('[data-target="ABS"]').classList.add('active');
+    }
+}
+
+joystickZone.addEventListener('pointerdown', (e) => {
+    stickActive = true;
+    joystickStick.style.background = '#e0e0e0'; // 按下時變色回饋
+    handleStick(e);
+    joystickZone.setPointerCapture(e.pointerId);
+});
+
+joystickZone.addEventListener('pointermove', handleStick);
+
+joystickZone.addEventListener('pointerup', (e) => {
+    stickActive = false;
+    stickVector = {x: 0, y: 0};
+    joystickStick.style.transform = `translate(-50%, -50%)`; // 歸中
+    joystickStick.style.background = 'var(--accent)';
+    joystickZone.releasePointerCapture(e.pointerId);
+});
+
+canvas.addEventListener('pointerdown', (e) => {
+    isDragging = true;
+    lastMouse = {x: e.clientX, y: e.clientY};
+});
+
+window.addEventListener('pointerup', () => isDragging = false);
+
+window.addEventListener('pointermove', (e) => {
+    if (!isDragging) return;
+    
+    // 如果用戶手動拖曳，自動切換為 ABS 模式並解除鎖定
+    if (State.drone.target !== 'ABS') {
+        State.drone.target = 'ABS';
+        document.querySelectorAll('#targetButtons button').forEach(b => b.classList.remove('active'));
+        document.querySelector('[data-target="ABS"]').classList.add('active');
+    }
+
+    const dx = e.clientX - lastMouse.x;
+    const dy = e.clientY - lastMouse.y;
+    
+    // 將螢幕像素位移轉換為世界座標位移 (注意 Y 軸方向)
+    State.drone.x -= dx / State.drone.zoom;
+    State.drone.y += dy / State.drone.zoom; 
+    
+    lastMouse = {x: e.clientX, y: e.clientY};
+});
+
+// 滑鼠滾輪縮放
+canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    let z = State.drone.zoom - e.deltaY * 0.001;
+    z = Math.max(0.1, Math.min(5, z));
+    State.drone.zoom = z;
+    document.getElementById('zoomSlider').value = z;
+    document.getElementById('zoomVal').innerText = z.toFixed(1) + 'x';
+}, { passive: false });
+
+
+// --- 啟動 ---
+buildUI();
+requestAnimationFrame(render);
+
+</script>
+</body>
+</html>
